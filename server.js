@@ -38,7 +38,7 @@ function auth(req, res, next) {
     }
 }
 
-app.get('/api/health', (req, res) => res.json({ status: 'ok' }));
+app.get('/api/health', (req, res) => res.json({ status: 'roto' }));
 
 // ---------- LOGIN ----------
 app.post('/api/login', (req, res) => {
