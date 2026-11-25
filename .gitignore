@@ -1,0 +1,7 @@
+node_modules/
+reports/
+data/
+data.db
+__pycache__/
+.pytest_cache/
+test-results/

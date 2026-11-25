@@ -1,0 +1,222 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Panel de administración</title>
+<style>
+  :root{--bg:#f6f7f9;--card:#fff;--text:#1d2430;--muted:#5d6878;--line:#d9dee5;--accent:#1f5fbf;--danger:#b3261e}
+  @media (prefers-color-scheme:dark){:root{--bg:#14181f;--card:#1c222b;--text:#e8ecf2;--muted:#9aa5b5;--line:#2e3744;--accent:#6aa4ff;--danger:#ff8a80}}
+  *{box-sizing:border-box}
+  body{margin:0;font-family:system-ui,-apple-system,"Segoe UI",sans-serif;background:var(--bg);color:var(--text)}
+  main{max-width:880px;margin:0 auto;padding:24px 16px}
+  h1,h2{margin:0 0 12px}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:8px;padding:16px;margin-bottom:20px}
+  input,select{padding:8px;border:1px solid var(--line);border-radius:6px;background:var(--bg);color:var(--text);font:inherit}
+  button{padding:8px 14px;border:0;border-radius:6px;background:var(--accent);color:#fff;font:inherit;cursor:pointer}
+  button.sec{background:transparent;color:var(--accent);border:1px solid var(--accent)}
+  button.del{background:var(--danger)}
+  button:focus-visible,input:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+  form{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:12px}
+  table{width:100%;border-collapse:collapse}
+  th,td{text-align:left;padding:8px;border-bottom:1px solid var(--line)}
+  td.act{display:flex;gap:6px}
+  .err{color:var(--danger);min-height:1.2em}
+  nav{display:flex;gap:8px;align-items:center;margin-bottom:16px}
+  nav .sp{flex:1}
+  .hidden{display:none}
+  #login-box{max-width:340px;margin:12vh auto}
+  #login-box form{flex-direction:column}
+</style>
+</head>
+<body>
+<main>
+
+  <!-- LOGIN -->
+  <section id="login-section" class="card" >
+    <div id="login-box">
+      <h1>Iniciar sesión</h1>
+      <form id="login-form">
+        <input id="email" type="email" placeholder="Correo" required>
+        <input id="password" type="password" placeholder="Contraseña" required>
+        <button id="login-btn" type="submit">Entrar</button>
+      </form>
+      <div id="login-error" class="err"></div>
+    </div>
+  </section>
+
+  <!-- APP -->
+  <section id="app-section" class="hidden">
+    <nav>
+      <h1 id="welcome">Panel</h1>
+      <span class="sp"></span>
+      <button id="tab-users" class="sec" type="button">Usuarios</button>
+      <button id="tab-products" class="sec" type="button">Productos</button>
+      <button id="logout-btn" type="button">Cerrar sesión</button>
+    </nav>
+
+    <!-- USUARIOS -->
+    <div id="users-section" class="card">
+      <h2>Usuarios</h2>
+      <form id="user-form">
+        <input type="hidden" id="user-id">
+        <input id="user-name" placeholder="Nombre" required>
+        <input id="user-email" type="email" placeholder="Correo" required>
+        <input id="user-password" type="password" placeholder="Contraseña (solo al crear)">
+        <select id="user-role"><option value="user">user</option><option value="admin">admin</option></select>
+        <button id="user-save" type="submit">Guardar usuario</button>
+        <button id="user-cancel" type="button" class="sec">Limpiar</button>
+      </form>
+      <div id="user-error" class="err"></div>
+      <table><thead><tr><th>ID</th><th>Nombre</th><th>Correo</th><th>Rol</th><th>Acciones</th></tr></thead>
+        <tbody id="users-body"></tbody></table>
+    </div>
+
+    <!-- PRODUCTOS -->
+    <div id="products-section" class="card hidden">
+      <h2>Productos</h2>
+      <form id="product-form">
+        <input type="hidden" id="product-id">
+        <input id="product-name" placeholder="Nombre" required>
+        <input id="product-price" type="number" step="0.01" min="0" placeholder="Precio" required>
+        <input id="product-stock" type="number" min="0" placeholder="Stock">
+        <button id="product-save" type="submit">Guardar producto</button>
+        <button id="product-cancel" type="button" class="sec">Limpiar</button>
+      </form>
+      <div id="product-error" class="err"></div>
+      <table><thead><tr><th>ID</th><th>Nombre</th><th>Precio</th><th>Stock</th><th>Acciones</th></tr></thead>
+        <tbody id="products-body"></tbody></table>
+    </div>
+  </section>
+
+</main>
+
+<script>
+  const $ = id => document.getElementById(id);
+  let token = localStorage.getItem('token');
+
+  // Evita inyección de HTML al pintar datos
+  const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+
+  async function api(method, url, body) {
+    const res = await fetch(url, {
+      method,
+      headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: 'Bearer ' + token } : {}) },
+      body: body ? JSON.stringify(body) : undefined
+    });
+    const data = await res.json().catch(() => ({}));
+    if (res.status === 401 && token) logout();
+    if (!res.ok) throw new Error(data.error || 'Error ' + res.status);
+    return data;
+  }
+
+  /* ---------- Sesión ---------- */
+  function showApp() {
+    $('login-section').classList.add('hidden');
+    $('app-section').classList.remove('hidden');
+    const u = JSON.parse(localStorage.getItem('user') || '{}');
+    $('welcome').textContent = 'Hola, ' + (u.name || 'usuario');
+    showTab('users');
+  }
+  function logout() {
+    token = null;
+    localStorage.removeItem('token'); localStorage.removeItem('user');
+    $('app-section').classList.add('hidden');
+    $('login-section').classList.remove('hidden');
+  }
+  $('login-form').addEventListener('submit', async e => {
+    e.preventDefault();
+    $('login-error').textContent = '';
+    try {
+      const r = await api('POST', '/api/login', { email: $('email').value, password: $('password').value });
+      token = r.token;
+      localStorage.setItem('token', token);
+      localStorage.setItem('user', JSON.stringify(r.user));
+      showApp();
+    } catch (err) { $('login-error').textContent = err.message; }
+  });
+  $('logout-btn').addEventListener('click', logout);
+
+  function showTab(t) {
+    $('users-section').classList.toggle('hidden', t !== 'users');
+    $('products-section').classList.toggle('hidden', t !== 'products');
+    t === 'users' ? loadUsers() : loadProducts();
+  }
+  $('tab-users').addEventListener('click', () => showTab('users'));
+  $('tab-products').addEventListener('click', () => showTab('products'));
+
+  /* ---------- Usuarios ---------- */
+  async function loadUsers() {
+    const rows = await api('GET', '/api/users');
+    $('users-body').innerHTML = rows.map(u => `
+      <tr data-id="${u.id}">
+        <td>${u.id}</td><td>${esc(u.name)}</td><td>${esc(u.email)}</td><td>${esc(u.role)}</td>
+        <td class="act">
+          <button class="sec edit-user" data-id="${u.id}" type="button">Editar</button>
+          <button class="del delete-user" data-id="${u.id}" type="button">Eliminar</button>
+        </td>
+      </tr>`).join('');
+  }
+  function clearUser() { $('user-form').reset(); $('user-id').value = ''; $('user-password').disabled = false; }
+  $('user-cancel').addEventListener('click', clearUser);
+  $('user-form').addEventListener('submit', async e => {
+    e.preventDefault(); $('user-error').textContent = '';
+    const id = $('user-id').value;
+    const body = { name: $('user-name').value, email: $('user-email').value, role: $('user-role').value };
+    try {
+      if (id) await api('PUT', '/api/users/' + id, body);
+      else await api('POST', '/api/users', { ...body, password: $('user-password').value });
+      clearUser(); loadUsers();
+    } catch (err) { $('user-error').textContent = err.message; }
+  });
+  $('users-body').addEventListener('click', async e => {
+    const id = e.target.dataset.id; if (!id) return;
+    if (e.target.classList.contains('edit-user')) {
+      const u = await api('GET', '/api/users/' + id);
+      $('user-id').value = u.id; $('user-name').value = u.name;
+      $('user-email').value = u.email; $('user-role').value = u.role;
+      $('user-password').value = ''; $('user-password').disabled = true;
+    } else if (e.target.classList.contains('delete-user')) {
+      await api('DELETE', '/api/users/' + id); loadUsers();
+    }
+  });
+
+  /* ---------- Productos ---------- */
+  async function loadProducts() {
+    const rows = await api('GET', '/api/products');
+    $('products-body').innerHTML = rows.map(p => `
+      <tr data-id="${p.id}">
+        <td>${p.id}</td><td>${esc(p.name)}</td><td>${Number(p.price).toFixed(2)}</td><td>${p.stock}</td>
+        <td class="act">
+          <button class="sec edit-product" data-id="${p.id}" type="button">Editar</button>
+          <button class="del delete-product" data-id="${p.id}" type="button">Eliminar</button>
+        </td>
+      </tr>`).join('');
+  }
+  function clearProduct() { $('product-form').reset(); $('product-id').value = ''; }
+  $('product-cancel').addEventListener('click', clearProduct);
+  $('product-form').addEventListener('submit', async e => {
+    e.preventDefault(); $('product-error').textContent = '';
+    const id = $('product-id').value;
+    const body = { name: $('product-name').value, price: parseFloat($('product-price').value), stock: parseInt($('product-stock').value || '0', 10) };
+    try {
+      if (id) await api('PUT', '/api/products/' + id, body);
+      else await api('POST', '/api/products', body);
+      clearProduct(); loadProducts();
+    } catch (err) { $('product-error').textContent = err.message; }
+  });
+  $('products-body').addEventListener('click', async e => {
+    const id = e.target.dataset.id; if (!id) return;
+    if (e.target.classList.contains('edit-product')) {
+      const p = await api('GET', '/api/products/' + id);
+      $('product-id').value = p.id; $('product-name').value = p.name;
+      $('product-price').value = p.price; $('product-stock').value = p.stock;
+    } else if (e.target.classList.contains('delete-product')) {
+      await api('DELETE', '/api/products/' + id); loadProducts();
+    }
+  });
+
+  if (token) showApp();
+</script>
+</body>
+</html>
