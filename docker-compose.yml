@@ -6,6 +6,11 @@ services:
     environment:
       JWT_SECRET: ${JWT_SECRET:-cambia-esto-2026}
       DB_PATH: /data/data.db
+      OTLP_ENDPOINT: ${OTLP_ENDPOINT:-}
+      OTLP_USER: ${OTLP_USER:-}
+      OTLP_PASS: ${OTLP_PASS:-}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     volumes:
       - ./data:/data
 
