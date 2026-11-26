@@ -40,7 +40,7 @@ function auth(req, res, next) {
   }
 }
 
-app.get('/api/health', (req, res) => res.json({ status: 'roto' }));
+app.get('/api/health', (req, res) => res.json({ status: 'ok' }));
 
 // ---------- LOGIN ----------
 app.post('/api/login', (req, res) => {
