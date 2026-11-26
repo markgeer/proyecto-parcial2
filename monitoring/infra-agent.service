@@ -1,0 +1,14 @@
+[Unit]
+Description=Agente de metricas de infraestructura hacia OpenObserve
+After=network-online.target docker.service
+
+[Service]
+User=ubuntu
+EnvironmentFile=/home/ubuntu/app/.env
+WorkingDirectory=/home/ubuntu/app
+ExecStart=/usr/bin/python3 /home/ubuntu/app/monitoring/infra_agent.py
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
